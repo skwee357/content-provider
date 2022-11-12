@@ -15,8 +15,9 @@
     "bin"
   ],
   "scripts": {
-    "build": "tsc",
-    "postintall": "yarn build"
+    "prepare": "npm run compile",
+    "compile": "tsc",
+    "build": "tsc"
   },
   "bin": {
     "generate-content": "./bin/generate-content.mjs"
