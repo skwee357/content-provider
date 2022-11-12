@@ -1,19 +1,14 @@
 import path from "path";
 import fs from 'fs/promises';
-import { Static, Type } from "@sinclair/typebox";
-import { TypeCompiler } from "@sinclair/typebox/compiler";
 
 const CONFIG_FILE = 'content.config.json';
 
-const T = Type.Object({
-  sourceDir: Type.String(),
-  outFile: Type.String(),
-  defaultLocale: Type.String(),
-  locales: Type.Array(Type.String()),
-});
-
-const Config = TypeCompiler.Compile(T);
-type Config = Static<typeof T>;
+interface Config {
+  sourceDir: string;
+  outFile: string;
+  defaultLocale: string;
+  locales: string[];
+}
 
 let _config: Config | null = null;
 
@@ -29,11 +24,11 @@ export async function getConfig() {
     const data = await fs.readFile(p, 'utf-8');
     const config = JSON.parse(data);
 
-    if (!Config.Check(config)) {
+    if (!config.sourceDir || !config.outFile || !config.defaultLocale || !config.locales) {
       throw new Error(`config ${CONFIG_FILE} has invalid content`);
     }
 
-    _config = config;
+    _config = config as Config;
   }
 
   return _config;
