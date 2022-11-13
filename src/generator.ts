@@ -102,7 +102,7 @@ async function createDocuments(files: File[], defaultLocale: string): Promise<Do
         draft: (draft as boolean | undefined) || false,
         readingTime: { time, words, minutes: Math.ceil(minutes) },
         tags: ((tags || []) as string[]).map(tag => {
-          const title = tag.trim().replaceAll(/[-_]/, ' ');
+          const title = tag.trim().replaceAll(/[-_]/g, ' ');
           const slug = slugify(title, { lower: true });
           return {
             title,
