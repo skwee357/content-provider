@@ -4,3 +4,4 @@ yarn-error.log
 *.tsbuildinfo
 content.json
 Session.vim
+.DS_Store
