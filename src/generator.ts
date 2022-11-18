@@ -101,8 +101,8 @@ async function createDocuments(files: File[], defaultLocale: string): Promise<Do
         future: (date as Date).getTime() > Date.now(),
         draft: (draft as boolean | undefined) || false,
         readingTime: { time, words, minutes: Math.ceil(minutes) },
-        tags: ((tags || []) as string[]).map(tag => {
-          const title = tag.trim().split(/(?=[A-Z])/g).join(' ');
+        tags: ((tags || []) as string[]).map(tag => tag.trim()).filter(tag => tag.length > 0).map(tag => {
+          const title = tag.split(/(?=[A-Z])/g).join(' ');
           const slug = slugify(title, { lower: true });
           return {
             title,
@@ -127,7 +127,18 @@ export async function generateContent() {
   const config = await getConfig();
   const files = await getFiles(config.sourceDir);
   const documents = (await createDocuments(files, config.defaultLocale))
-    .filter(({ locale }) => config.locales.includes(locale));
+    .filter(({ locale }) => config.locales.includes(locale))
+    .filter(doc => {
+      if(doc.type !== 'post') {
+        return true;
+      }
+
+      if(doc.draft) {
+        console.warn(`-> Found draft post: ${doc.file.name} - skipping`);
+      }
+
+      return !doc.draft;
+    })
 
   documents.forEach((document, index) => {
     document.translations = documents.filter((d, i) => d.type === document.type && d.slug === document.slug && i !== index).map(({ locale, title, url }) => ({ locale, title, url }))
