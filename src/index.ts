@@ -37,12 +37,13 @@ export interface Post extends DocumentBase {
   date: string;
   future: boolean;
   draft: boolean;
+  cover?: string;
   tags: Tag[];
   readingTime: {
     minutes: number;
     time: number;
     words: number;
-  }
+  };
 }
 
 export type Document = Page | Post;

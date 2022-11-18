@@ -76,7 +76,7 @@ async function createDocuments(files: File[], defaultLocale: string): Promise<Do
         translations: []
       }
     } else if (file.dir === 'post') {
-      const { date, draft, tags } = frontmatter;
+      const { date, draft, tags, cover } = frontmatter;
 
       if (!date || !(date instanceof Date)) {
         throw new Error(`post ${slug} is missing date attribute`);
@@ -114,6 +114,10 @@ async function createDocuments(files: File[], defaultLocale: string): Promise<Do
               url: `/tag/${slug}`
             };
           })
+      }
+
+      if(cover) {
+        document.cover = cover;
       }
     } else {
       throw new Error(`unsupported dir ${file.dir}`);
