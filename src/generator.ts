@@ -101,15 +101,19 @@ async function createDocuments(files: File[], defaultLocale: string): Promise<Do
         future: (date as Date).getTime() > Date.now(),
         draft: (draft as boolean | undefined) || false,
         readingTime: { time, words, minutes: Math.ceil(minutes) },
-        tags: ((tags || []) as string[]).map(tag => tag.trim()).filter(tag => tag.length > 0).map(tag => {
-          const title = tag.split(/(?=[A-Z])/g).join(' ');
-          const slug = slugify(title, { lower: true });
-          return {
-            title,
-            slug,
-            url: `/tag/${slug}`
-          };
-        })
+        tags: ((tags || []) as (string | null)[])
+          .filter((tag): tag is Exclude<typeof tag, null> => !!tag)
+          .map(tag => tag?.trim())
+          .filter(tag => tag?.length || 0 > 0)
+          .map(tag => {
+            const title = tag.split(/(?=[A-Z])/g).join(' ');
+            const slug = slugify(title, { lower: true });
+            return {
+              title,
+              slug,
+              url: `/tag/${slug}`
+            };
+          })
       }
     } else {
       throw new Error(`unsupported dir ${file.dir}`);
@@ -129,11 +133,11 @@ export async function generateContent() {
   const documents = (await createDocuments(files, config.defaultLocale))
     .filter(({ locale }) => config.locales.includes(locale))
     .filter(doc => {
-      if(doc.type !== 'post') {
+      if (doc.type !== 'post') {
         return true;
       }
 
-      if(doc.draft) {
+      if (doc.draft) {
         console.warn(`-> Found draft post: ${doc.file.name} - skipping`);
       }
 
