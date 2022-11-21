@@ -106,7 +106,7 @@ async function createDocuments(files: File[], defaultLocale: string): Promise<Do
           .map(tag => tag?.trim())
           .filter(tag => tag?.length || 0 > 0)
           .map(tag => {
-            const title = tag.split('-').map(word => word.toUpperCase()).join(' ');
+            const title = tag.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
             const slug = slugify(title, { lower: true });
             return {
               title,
