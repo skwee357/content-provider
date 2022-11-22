@@ -1,9 +1,3 @@
-export interface Translation {
-  title: string;
-  url: string;
-  locale: string;
-}
-
 export interface Tag {
   title: string;
   slug: string;
@@ -12,8 +6,7 @@ export interface Tag {
 
 export type FileType = 'md' | 'mdx';
 
-interface DocumentBase {
-  type: 'page' | 'post';
+export interface Post {
   file: {
     name: string;
     type: FileType;
@@ -22,18 +15,8 @@ interface DocumentBase {
   slug: string;
   summary: string;
   canonical?: string;
-  url: string;
-  locale: string;
-  translations: Translation[];
   rawContent: string;
-}
-
-export interface Page extends DocumentBase {
-  type: 'page';
-}
-
-export interface Post extends DocumentBase {
-  type: 'post',
+  url: string;
   date: string;
   future: boolean;
   draft: boolean;
@@ -46,5 +29,4 @@ export interface Post extends DocumentBase {
   };
 }
 
-export type Document = Page | Post;
 export * from './provider.js';

@@ -24,7 +24,7 @@ export async function getConfig() {
     const data = await fs.readFile(p, 'utf-8');
     const config = JSON.parse(data);
 
-    if (!config.sourceDir || !config.outFile || !config.defaultLocale || !config.locales) {
+    if (!config.sourceDir || !config.outFile) {
       throw new Error(`config ${CONFIG_FILE} has invalid content`);
     }
 

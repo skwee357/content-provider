@@ -6,12 +6,12 @@ import { promises as fs } from 'fs';
 import slugify from "slugify";
 import RemoveMarkdown from 'remove-markdown';
 import readingTime from "reading-time";
-import { Document, FileType, Page, Post } from "./index.js";
+import { FileType, Post } from "./index.js";
 import { getConfig } from "./config.js";
 
-const CONTENT_FILES_GLOB = '**/*.(md|mdx)';
+const CONTENT_FILES_GLOB = 'post/*.(md|mdx)';
 const EXCERPT_SEPARATOR = '<!--more-->';
-const SUPPORTED_DIRS = ['', 'post'];
+const SUPPORTED_DIRS = ['post'];
 
 interface File {
   path: string;
@@ -48,109 +48,73 @@ async function getFiles(contentDir: string): Promise<File[]> {
   return files;
 }
 
-async function createDocuments(files: File[], defaultLocale: string): Promise<Document[]> {
+async function createPost(files: File[]): Promise<Post[]> {
   return Promise.all(files.map(async (file) => {
     const source = await fs.readFile(file.path, 'utf-8');
-    const { data: { title: maybeTitle, slug: maybeSlug, locale: maybeLocale, canonical, summary: maybeSummary, ...frontmatter }, excerpt, content } = matter(source, { excerpt_separator: EXCERPT_SEPARATOR });
+    const { data: { title: maybeTitle, slug: maybeSlug, canonical, summary: maybeSummary, date, draft, tags, cover }, excerpt, content } = matter(source, { excerpt_separator: EXCERPT_SEPARATOR });
     const title = (maybeTitle as string | undefined) || file.name;
     const slug = (maybeSlug as string | undefined) || slugify(file.name, { lower: true });
     const summary = RemoveMarkdown(excerpt || maybeSummary || "");
-    const locale = (maybeLocale as string | undefined) || defaultLocale;
     const rawContent = content.replace(EXCERPT_SEPARATOR, '');
 
-    let document: Post | Page;
+    if (!date || !(date instanceof Date)) {
+      throw new Error(`post ${slug} is missing date attribute`);
+    }
 
-    if (file.dir === '') {
-      document = {
-        type: 'page',
-        file: {
-          name: file.name,
-          type: file.ext as FileType,
-        },
-        title,
-        slug,
-        locale,
-        summary,
-        rawContent,
-        url: `/${slug}`,
-        translations: []
-      }
-    } else if (file.dir === 'post') {
-      const { date, draft, tags, cover } = frontmatter;
+    const { time, words, minutes } = readingTime(content);
 
-      if (!date || !(date instanceof Date)) {
-        throw new Error(`post ${slug} is missing date attribute`);
-      }
+    const post: Post = {
+      file: {
+        name: file.name,
+        type: file.ext.slice(1) as FileType
+      },
+      title,
+      slug,
+      summary,
+      rawContent,
+      url: `/post/${slug}`,
+      date: (date as Date).toISOString(),
+      future: (date as Date).getTime() > Date.now(),
+      draft: (draft as boolean | undefined) || false,
+      readingTime: { time, words, minutes: Math.ceil(minutes) },
+      tags: ((tags || []) as (string | null)[])
+        .filter((tag): tag is Exclude<typeof tag, null> => !!tag)
+        .map(tag => tag?.trim())
+        .filter(tag => tag?.length || 0 > 0)
+        .map(tag => {
+          const title = tag.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+          const slug = slugify(title, { lower: true });
+          return {
+            title,
+            slug,
+            url: `/tag/${slug}`
+          };
+        })
+    }
 
-      const { time, words, minutes } = readingTime(content);
-
-      document = {
-        type: 'post',
-        file: {
-          name: file.name,
-          type: file.ext as FileType,
-        },
-        title,
-        slug,
-        locale,
-        summary,
-        rawContent,
-        translations: [],
-        url: `/post/${slug}`,
-        date: (date as Date).toISOString(),
-        future: (date as Date).getTime() > Date.now(),
-        draft: (draft as boolean | undefined) || false,
-        readingTime: { time, words, minutes: Math.ceil(minutes) },
-        tags: ((tags || []) as (string | null)[])
-          .filter((tag): tag is Exclude<typeof tag, null> => !!tag)
-          .map(tag => tag?.trim())
-          .filter(tag => tag?.length || 0 > 0)
-          .map(tag => {
-            const title = tag.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-            const slug = slugify(title, { lower: true });
-            return {
-              title,
-              slug,
-              url: `/tag/${slug}`
-            };
-          })
-      }
-
-      if(cover) {
-        document.cover = cover;
-      }
-    } else {
-      throw new Error(`unsupported dir ${file.dir}`);
+    if (cover) {
+      post.cover = cover;
     }
 
     if (canonical) {
-      document.canonical = canonical;
+      post.canonical = canonical;
     }
 
-    return document;
+    return post;
   }))
 }
 
 export async function generateContent() {
   const config = await getConfig();
   const files = await getFiles(config.sourceDir);
-  const documents = (await createDocuments(files, config.defaultLocale))
-    .filter(({ locale }) => config.locales.includes(locale))
+  const documents = (await createPost(files))
     .filter(doc => {
-      if (doc.type !== 'post') {
-        return true;
-      }
-
       if (doc.draft) {
         console.warn(`-> Found draft post: ${doc.file.name} - skipping`);
       }
 
       return !doc.draft;
     })
-
-  documents.forEach((document, index) => {
-    document.translations = documents.filter((d, i) => d.type === document.type && d.slug === document.slug && i !== index).map(({ locale, title, url }) => ({ locale, title, url }))
-  })
 
   await fs.writeFile(path.join(process.cwd(), config.outFile), JSON.stringify(documents), { encoding: 'utf-8', flag: 'w' });
 }
