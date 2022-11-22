@@ -9,9 +9,8 @@ import readingTime from "reading-time";
 import { FileType, Post } from "./index.js";
 import { getConfig } from "./config.js";
 
-const CONTENT_FILES_GLOB = 'post/*.(md|mdx)';
+const CONTENT_FILES_GLOB = '*.(md|mdx)';
 const EXCERPT_SEPARATOR = '<!--more-->';
-const SUPPORTED_DIRS = ['post'];
 
 interface File {
   path: string;
@@ -32,10 +31,6 @@ async function getFiles(contentDir: string): Promise<File[]> {
   const files = (await globby(CONTENT_FILES_GLOB, { cwd: pathToContent }))
     .map(file => {
       const { name, ext, dir } = path.parse(file);
-
-      if (!SUPPORTED_DIRS.includes(dir)) {
-        throw new Error(`unsupported dir ${dir} - ${name}`);
-      }
 
       return {
         path: path.join(pathToContent, file),
