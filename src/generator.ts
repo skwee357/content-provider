@@ -19,6 +19,22 @@ interface File {
   ext: string;
 }
 
+function toISOStringWithTimeZone(date: Date) {
+  const tzOffset = -date.getTimezoneOffset();
+  const diff = tzOffset >= 0 ? '+' : '-';
+
+  const pad = (n: number) => `${Math.floor(Math.abs(n))}`.padStart(2, '0');
+
+  return date.getFullYear() +
+    '-' + pad(date.getMonth() + 1) +
+    '-' + pad(date.getDate()) +
+    'T' + pad(date.getHours()) +
+    ':' + pad(date.getMinutes()) +
+    ':' + pad(date.getSeconds()) +
+    diff + pad(tzOffset / 60) +
+    ':' + pad(tzOffset % 60);
+}
+
 function resolveHome(filepath: string): string {
   if (filepath[0] === '~' && filepath[1] === '/') {
     return path.join(os.homedir(), filepath.slice(1));
@@ -43,6 +59,8 @@ async function getFiles(contentDir: string): Promise<File[]> {
   return files;
 }
 
+const isDate = (date: unknown): date is Date => !!date && date instanceof Date;
+
 async function createPost(files: File[]): Promise<Post[]> {
   return Promise.all(files.map(async (file) => {
     const source = await fs.readFile(file.path, 'utf-8');
@@ -52,7 +70,7 @@ async function createPost(files: File[]): Promise<Post[]> {
     const summary = RemoveMarkdown(excerpt || maybeSummary || "");
     const rawContent = content.replace(EXCERPT_SEPARATOR, '');
 
-    if (!date || !(date instanceof Date)) {
+    if (!isDate(date)) {
       throw new Error(`post ${slug} is missing date attribute`);
     }
 
@@ -68,8 +86,8 @@ async function createPost(files: File[]): Promise<Post[]> {
       summary,
       rawContent,
       url: `/post/${slug}`,
-      date: (date as Date).toISOString(),
-      future: (date as Date).getTime() > Date.now(),
+      date: toISOStringWithTimeZone(date),
+      future: date.getTime() > Date.now(),
       draft: (draft as boolean | undefined) || false,
       readingTime: { time, words, minutes: Math.ceil(minutes) },
       tags: ((tags || []) as (string | null)[])
