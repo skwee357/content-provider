@@ -144,9 +144,9 @@ async function createPost(files: File[]): Promise<Post[]> {
 async function writePost(outDir: string, post: Post) {
   const pathToFile = path.join(outDir, post.slug + '.json');
   const content = JSON.stringify(post);
-  const exists = fs.existsSync(pathToFile);
 
-  if (exists) {
+  try {
+    await fsPromises.access(pathToFile, fs.constants.R_OK | fs.constants.W_OK);
     console.log(chalk.yellow(`-> Found existing file for post: ${post.slug}`));
     const contentHash = calculateContentHash(content);
     const fileHash = await calculateFileHash(pathToFile);
@@ -157,7 +157,7 @@ async function writePost(outDir: string, post: Post) {
     } else {
       console.log(chalk.yellow("\t⚠ Has is not the same, overwriting file"));
     }
-  } else {
+  } catch (err) {
     console.log(chalk.blue(`-> Post ${post.slug} does not exist, creating one`))
   }
 
