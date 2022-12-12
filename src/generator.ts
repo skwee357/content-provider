@@ -11,6 +11,7 @@ import RemoveMarkdown from 'remove-markdown';
 import readingTime from "reading-time";
 import { FileType, Post } from "./index.js";
 import { getConfig } from "./config.js";
+import ora, { Ora } from "ora";
 
 const CONTENT_FILES_GLOB = '*.(md|mdx)';
 const EXCERPT_SEPARATOR = '<!--more-->';
@@ -141,28 +142,34 @@ async function createPost(files: File[]): Promise<Post[]> {
   }))
 }
 
-async function writePost(outDir: string, post: Post) {
+type ProcessedPostStatus = 'existing' | 'overwritten' | 'new';
+
+async function writePost(outDir: string, post: Post, progress: Ora): Promise<ProcessedPostStatus> {
   const pathToFile = path.join(outDir, post.slug + '.json');
   const content = JSON.stringify(post);
+  let res: ProcessedPostStatus = 'new';
 
   try {
     await fsPromises.access(pathToFile, fs.constants.R_OK | fs.constants.W_OK);
-    console.log(chalk.yellow(`-> ${post.slug} - already exists`));
+    progress.text = chalk.yellow(`-> ${post.slug} - already exists`)
     const contentHash = calculateContentHash(content);
     const fileHash = await calculateFileHash(pathToFile);
 
     if (contentHash === fileHash) {
-      console.log(chalk.yellow(`⚠ ${post.slug} - hash is the same, skipping`));
-      return;
+      progress.stopAndPersist({ symbol: '⚠', text: chalk.yellow(`${post.slug} - hash is the same, skipping`) });
+      return 'existing';
     } else {
-      console.log(chalk.yellow(`⚠ ${post.slug} - hash is not the same, overwriting`));
+      progress.text = `${post.slug} - hash is not the same, overwriting`;
+      res = 'overwritten';
     }
   } catch (err) {
-    console.log(chalk.blue(`-> ${post.slug} - does not exist, createing one`))
+    progress.text = `${post.slug} - does not exist, creating one`;
   }
 
   await fsPromises.writeFile(pathToFile, content, { encoding: 'utf-8', flag: 'w' });
-  console.log(chalk.green(`✓ ${post.slug} - created`));
+  progress.stopAndPersist({ symbol: '✓', text: chalk.green(`${post.slug} - created`) });
+
+  return res;
 }
 
 export async function generateContent() {
@@ -170,15 +177,30 @@ export async function generateContent() {
   const files = await getFiles(config.sourceDir);
   const outDir = path.join(process.cwd(), config.outDir);
 
-  await Promise.all(
+  let draftPosts = 0;
+
+  const res = await Promise.all(
     (await createPost(files))
-      .filter(post => {
+      .map(post => ({ post, progress: ora(post.slug).start() }))
+      .filter(({ post, progress }) => {
         if (post.draft) {
-          console.log(chalk.yellow(`-> ${post.slug} - is draft, skipping`));
+          progress.stopAndPersist({ prefixText: '', text: chalk.cyan(`${post.slug} - is draft, skipping`) })
+          draftPosts++;
         }
 
         return !post.draft;
       })
-      .map(post => writePost(outDir, post))
+      .map(({ post, progress }) => writePost(outDir, post, progress))
   );
+
+  const sums = res.reduce((agg, item) => {
+    const key = item as string;
+    if (!agg[key]) {
+      agg[key] = 0;
+    }
+    agg[key]++;
+    return agg;
+  }, {} as { [key: string]: number });
+
+  console.log(chalk.blue(`Done. Draft - ${draftPosts}. New - ${sums['new'] || 0}. Existing - ${sums['existing'] || 0}. Overwritten - ${sums['overwritten'] || 0}`));
 }
