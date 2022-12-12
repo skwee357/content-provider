@@ -147,22 +147,22 @@ async function writePost(outDir: string, post: Post) {
 
   try {
     await fsPromises.access(pathToFile, fs.constants.R_OK | fs.constants.W_OK);
-    console.log(chalk.yellow(`-> Found existing file for post: ${post.slug}`));
+    console.log(chalk.yellow(`-> ${post.slug} - already exists`));
     const contentHash = calculateContentHash(content);
     const fileHash = await calculateFileHash(pathToFile);
 
     if (contentHash === fileHash) {
-      console.log(chalk.yellow("\t⚠ Hash is the same, skipping"));
+      console.log(chalk.yellow(`⚠ ${post.slug} - hash is the same, skipping`));
       return;
     } else {
-      console.log(chalk.yellow("\t⚠ Has is not the same, overwriting file"));
+      console.log(chalk.yellow(`⚠ ${post.slug} - hash is not the same, overwriting`));
     }
   } catch (err) {
-    console.log(chalk.blue(`-> Post ${post.slug} does not exist, creating one`))
+    console.log(chalk.blue(`-> ${post.slug} - does not exist, createing one`))
   }
 
   await fsPromises.writeFile(pathToFile, content, { encoding: 'utf-8', flag: 'w' });
-  console.log(chalk.green(`✓ Done processing ${post.slug}`));
+  console.log(chalk.green(`✓ ${post.slug} - created`));
 }
 
 export async function generateContent() {
@@ -174,7 +174,7 @@ export async function generateContent() {
     (await createPost(files))
       .filter(post => {
         if (post.draft) {
-          console.log(chalk.yellow(`-> Found draft post: ${post.file.name} - skipping`));
+          console.log(chalk.yellow(`-> ${post.slug} - is draft, skipping`));
         }
 
         return !post.draft;
