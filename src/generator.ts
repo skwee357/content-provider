@@ -144,8 +144,9 @@ async function createPost(files: File[]): Promise<Post[]> {
 async function writePost(outDir: string, post: Post) {
   const pathToFile = path.join(outDir, post.slug + '.json');
   const content = JSON.stringify(post);
-  const stats = await fsPromises.stat(pathToFile);
-  if (stats.isFile()) {
+  const exists = fs.existsSync(pathToFile);
+
+  if (exists) {
     console.log(chalk.yellow(`-> Found existing file for post: ${post.slug}`));
     const contentHash = calculateContentHash(content);
     const fileHash = await calculateFileHash(pathToFile);
