@@ -5,7 +5,7 @@ const CONFIG_FILE = 'content.config.json';
 
 interface Config {
   sourceDir: string;
-  outFile: string;
+  outDir: string;
   defaultLocale: string;
   locales: string[];
 }
@@ -24,7 +24,7 @@ export async function getConfig() {
     const data = await fs.readFile(p, 'utf-8');
     const config = JSON.parse(data);
 
-    if (!config.sourceDir || !config.outFile) {
+    if (!config.sourceDir || !config.outDir) {
       throw new Error(`config ${CONFIG_FILE} has invalid content`);
     }
 

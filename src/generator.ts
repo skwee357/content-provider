@@ -1,8 +1,11 @@
 import matter from "gray-matter";
 import path from "path";
 import os from "os";
+import crypto from 'crypto';
 import { globby } from "globby";
-import { promises as fs } from 'fs';
+import { promises as fsPromises } from 'fs';
+import fs from 'fs';
+import chalk from 'chalk';
 import slugify from "slugify";
 import RemoveMarkdown from 'remove-markdown';
 import readingTime from "reading-time";
@@ -11,6 +14,7 @@ import { getConfig } from "./config.js";
 
 const CONTENT_FILES_GLOB = '*.(md|mdx)';
 const EXCERPT_SEPARATOR = '<!--more-->';
+const FILE_HASH_ALGO = 'sha256';
 
 interface File {
   path: string;
@@ -59,11 +63,32 @@ async function getFiles(contentDir: string): Promise<File[]> {
   return files;
 }
 
+async function calculateFileHash(path: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const hash = crypto.createHash(FILE_HASH_ALGO);
+    const stream = fs.createReadStream(path);
+
+    stream.on('data', chunk => hash.update(chunk));
+    stream.on('error', err => reject(err));
+
+    stream.on('end', () => {
+      const fileHash = hash.digest('hex');
+      resolve(fileHash);
+    })
+  });
+}
+
+function calculateContentHash(content: string) {
+  const hash = crypto.createHash(FILE_HASH_ALGO);
+  hash.update(content);
+  return hash.digest('hex');
+}
+
 const isDate = (date: unknown): date is Date => !!date && date instanceof Date;
 
 async function createPost(files: File[]): Promise<Post[]> {
   return Promise.all(files.map(async (file) => {
-    const source = await fs.readFile(file.path, 'utf-8');
+    const source = await fsPromises.readFile(file.path, 'utf-8');
     const { data: { title: maybeTitle, slug: maybeSlug, canonical, summary: maybeSummary, date, draft, tags, cover }, excerpt, content } = matter(source, { excerpt_separator: EXCERPT_SEPARATOR });
     const title = (maybeTitle as string | undefined) || file.name;
     const slug = (maybeSlug as string | undefined) || slugify(file.name, { lower: true });
@@ -87,7 +112,6 @@ async function createPost(files: File[]): Promise<Post[]> {
       rawContent,
       url: `/post/${slug}`,
       date: toISOStringWithTimeZone(date),
-      future: date.getTime() > Date.now(),
       draft: (draft as boolean | undefined) || false,
       readingTime: { time, words, minutes: Math.ceil(minutes) },
       tags: ((tags || []) as (string | null)[])
@@ -117,17 +141,43 @@ async function createPost(files: File[]): Promise<Post[]> {
   }))
 }
 
+async function writePost(outDir: string, post: Post) {
+  const pathToFile = path.join(outDir, post.slug + '.json');
+  const content = JSON.stringify(post);
+  const stats = await fsPromises.stat(pathToFile);
+  if (stats.isFile()) {
+    console.log(chalk.yellow(`-> Found existing file for post: ${post.slug}`));
+    const contentHash = calculateContentHash(content);
+    const fileHash = await calculateFileHash(pathToFile);
+
+    if (contentHash === fileHash) {
+      console.log(chalk.yellow("\t⚠ Hash is the same, skipping"));
+      return;
+    } else {
+      console.log(chalk.yellow("\t⚠ Has is not the same, overwriting file"));
+    }
+  } else {
+    console.log(chalk.blue(`-> Post ${post.slug} does not exist, creating one`))
+  }
+
+  await fsPromises.writeFile(pathToFile, content, { encoding: 'utf-8', flag: 'w' });
+  console.log(chalk.green(`✓ Done processing ${post.slug}`));
+}
+
 export async function generateContent() {
   const config = await getConfig();
   const files = await getFiles(config.sourceDir);
-  const documents = (await createPost(files))
-    .filter(doc => {
-      if (doc.draft) {
-        console.warn(`-> Found draft post: ${doc.file.name} - skipping`);
-      }
+  const outDir = path.join(process.cwd(), config.outDir);
 
-      return !doc.draft;
-    })
+  await Promise.all(
+    (await createPost(files))
+      .filter(post => {
+        if (post.draft) {
+          console.log(chalk.yellow(`-> Found draft post: ${post.file.name} - skipping`));
+        }
 
-  await fs.writeFile(path.join(process.cwd(), config.outFile), JSON.stringify(documents), { encoding: 'utf-8', flag: 'w' });
+        return !post.draft;
+      })
+      .map(post => writePost(outDir, post))
+  );
 }
