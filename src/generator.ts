@@ -17,6 +17,8 @@ const CONTENT_FILES_GLOB = '*.(md|mdx)';
 const EXCERPT_SEPARATOR = '<!--more-->';
 const FILE_HASH_ALGO = 'sha256';
 
+const ID_HASH_ALGO = 'sha256';
+
 interface File {
   path: string;
   name: string;
@@ -114,11 +116,14 @@ async function createPost(files: File[]): Promise<Array<Post & AttributeDraft>> 
 
     const { time: _time, text: _text, words, minutes } = readingTime(content);
 
+    const id = crypto.createHash(ID_HASH_ALGO).update(slug, 'utf8').digest('hex');
+
     const post: Post & AttributeDraft = {
       file: {
         name: file.name,
         type: file.ext.slice(1) as FileType
       },
+      id,
       title,
       slug,
       summary,

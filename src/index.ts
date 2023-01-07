@@ -22,6 +22,7 @@ export interface Post {
     name: string;
     type: FileType;
   };
+  id: string;
   title: string;
   slug: string;
   summary: string;
