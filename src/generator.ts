@@ -90,26 +90,26 @@ const isDate = (date: unknown): date is Date => !!date && date instanceof Date;
 async function createPost(files: File[]): Promise<Array<Post & AttributeDraft>> {
   return Promise.all(files.map(async (file) => {
     const source = await fsPromises.readFile(file.path, 'utf-8');
-    const { data: { title: maybeTitle, slug: maybeSlug, canonical, summary: maybeSummary, date, publishDate, updateDate, draft, tags, cover }, excerpt, content } = matter(source, { excerpt_separator: EXCERPT_SEPARATOR });
+    const { data: { title: maybeTitle, slug: maybeSlug, canonical, summary: maybeSummary, date: maybeDate, publishDate: maybePublishDate, updateDate: maybeUpdateDate, draft, tags, cover }, excerpt, content } = matter(source, { excerpt_separator: EXCERPT_SEPARATOR });
     const title = (maybeTitle as string | undefined) || file.name;
     const slug = (maybeSlug as string | undefined) || slugify(file.name, { lower: true });
     const summary = RemoveMarkdown(excerpt || maybeSummary || "");
     const rawContent = content.replace(EXCERPT_SEPARATOR, '');
 
-    let publishedDate, updatedDate;
+    let publishDate, updateDate;
 
-    if (isDate(date)) {
-      publishedDate = toISOStringWithTimeZone(date)
-    } else if (isDate(publishDate)) {
-      publishedDate = toISOStringWithTimeZone(publishDate);
+    if (isDate(maybeDate)) {
+      publishDate = toISOStringWithTimeZone(maybeDate)
+    } else if (isDate(maybePublishDate)) {
+      publishDate = toISOStringWithTimeZone(maybePublishDate);
     } else {
       throw new Error(`post ${slug} is missing date or publish date attribute`);
     }
 
-    if (isDate(updateDate)) {
-      updatedDate = toISOStringWithTimeZone(updateDate);
+    if (isDate(maybeUpdateDate)) {
+      updateDate = toISOStringWithTimeZone(maybeUpdateDate);
     } else {
-      updatedDate = publishedDate;
+      updateDate = publishDate;
     }
 
     const { time: _time, text: _text, words, minutes } = readingTime(content);
@@ -123,8 +123,8 @@ async function createPost(files: File[]): Promise<Array<Post & AttributeDraft>> 
       slug,
       summary,
       rawContent,
-      publishedDate,
-      updatedDate,
+      publishDate,
+      updateDate,
       draft: (draft as boolean | undefined) || false,
       readingTime: { words, minutes: Math.ceil(minutes) },
       tags: ((tags || []) as (string | null)[])

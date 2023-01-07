@@ -27,8 +27,8 @@ export interface Post {
   summary: string;
   canonical?: string;
   rawContent: string;
-  publishedDate: string;
-  updatedDate: string;
+  publishDate: string;
+  updateDate: string;
   cover?: string | PostCover;
   tags: Tag[];
   readingTime: {

@@ -6,7 +6,7 @@ import { getConfig } from './config.js';
 
 let _posts: Post[] | null = null;
 
-export const sortChronologically = (a: Post, b: Post) => new Date(b.publishedDate).getTime() - new Date(a.publishedDate).getTime();
+export const sortChronologically = (a: Post, b: Post) => new Date(b.publishDate).getTime() - new Date(a.publishDate).getTime();
 
 export async function getPosts(): Promise<Post[]> {
   if (!_posts) {
