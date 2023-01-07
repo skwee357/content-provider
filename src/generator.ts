@@ -9,7 +9,7 @@ import chalk from 'chalk';
 import slugify from "slugify";
 import RemoveMarkdown from 'remove-markdown';
 import readingTime from "reading-time";
-import { FileType, Post } from "./index.js";
+import { AttributeDraft, FileType, Post } from "./index.js";
 import { getConfig } from "./config.js";
 import ora, { Ora } from "ora";
 
@@ -87,22 +87,34 @@ function calculateContentHash(content: string) {
 
 const isDate = (date: unknown): date is Date => !!date && date instanceof Date;
 
-async function createPost(files: File[]): Promise<Post[]> {
+async function createPost(files: File[]): Promise<Array<Post & AttributeDraft>> {
   return Promise.all(files.map(async (file) => {
     const source = await fsPromises.readFile(file.path, 'utf-8');
-    const { data: { title: maybeTitle, slug: maybeSlug, canonical, summary: maybeSummary, date, draft, tags, cover }, excerpt, content } = matter(source, { excerpt_separator: EXCERPT_SEPARATOR });
+    const { data: { title: maybeTitle, slug: maybeSlug, canonical, summary: maybeSummary, date, publishDate, updateDate, draft, tags, cover }, excerpt, content } = matter(source, { excerpt_separator: EXCERPT_SEPARATOR });
     const title = (maybeTitle as string | undefined) || file.name;
     const slug = (maybeSlug as string | undefined) || slugify(file.name, { lower: true });
     const summary = RemoveMarkdown(excerpt || maybeSummary || "");
     const rawContent = content.replace(EXCERPT_SEPARATOR, '');
 
-    if (!isDate(date)) {
-      throw new Error(`post ${slug} is missing date attribute`);
+    let publishedDate, updatedDate;
+
+    if (isDate(date)) {
+      publishedDate = toISOStringWithTimeZone(date)
+    } else if (isDate(publishDate)) {
+      publishedDate = toISOStringWithTimeZone(publishDate);
+    } else {
+      throw new Error(`post ${slug} is missing date or publish date attribute`);
     }
 
-    const { time, words, minutes } = readingTime(content);
+    if (isDate(updateDate)) {
+      updatedDate = toISOStringWithTimeZone(updateDate);
+    } else {
+      updatedDate = publishedDate;
+    }
 
-    const post: Post = {
+    const { time: _time, text: _text, words, minutes } = readingTime(content);
+
+    const post: Post & AttributeDraft = {
       file: {
         name: file.name,
         type: file.ext.slice(1) as FileType
@@ -111,10 +123,10 @@ async function createPost(files: File[]): Promise<Post[]> {
       slug,
       summary,
       rawContent,
-      url: `/post/${slug}`,
-      date: toISOStringWithTimeZone(date),
+      publishedDate,
+      updatedDate,
       draft: (draft as boolean | undefined) || false,
-      readingTime: { time, words, minutes: Math.ceil(minutes) },
+      readingTime: { words, minutes: Math.ceil(minutes) },
       tags: ((tags || []) as (string | null)[])
         .filter((tag): tag is Exclude<typeof tag, null> => !!tag)
         .map(tag => tag?.trim())
@@ -125,7 +137,6 @@ async function createPost(files: File[]): Promise<Post[]> {
           return {
             title,
             slug,
-            url: `/tag/${slug}`
           };
         })
     }
@@ -144,7 +155,7 @@ async function createPost(files: File[]): Promise<Post[]> {
 
 type ProcessedPostStatus = 'existing' | 'overwritten' | 'new';
 
-async function writePost(outDir: string, post: Post, progress: Ora): Promise<ProcessedPostStatus> {
+async function writePost(outDir: string, { draft: _, ...post }: Post & AttributeDraft, progress: Ora): Promise<ProcessedPostStatus> {
   const pathToFile = path.join(outDir, post.slug + '.json');
   const content = JSON.stringify(post);
   let res: ProcessedPostStatus = 'new';

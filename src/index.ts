@@ -1,7 +1,6 @@
 export interface Tag {
   title: string;
   slug: string;
-  url: string;
 }
 
 export type FileType = 'md' | 'mdx';
@@ -14,6 +13,10 @@ export interface PostCover {
   }
 }
 
+export interface AttributeDraft {
+  draft: boolean;
+}
+
 export interface Post {
   file: {
     name: string;
@@ -24,14 +27,12 @@ export interface Post {
   summary: string;
   canonical?: string;
   rawContent: string;
-  url: string;
-  date: string;
-  draft: boolean;
+  publishedDate: string;
+  updatedDate: string;
   cover?: string | PostCover;
   tags: Tag[];
   readingTime: {
     minutes: number;
-    time: number;
     words: number;
   };
 }
